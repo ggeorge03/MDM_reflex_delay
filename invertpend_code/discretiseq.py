@@ -55,7 +55,6 @@ def ics(t): # ddeint requires initial conditions to a callable func. essentially
 def control_input(t, tau, n_steps):
     u = np.zeros_like(t)
     u[t < tau] = 0 # input before delay should be nothing as human won't have realised to make a change.
-    print(u)
     return u
 
 t = np.linspace(0,100, 1000)
