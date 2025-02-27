@@ -1,4 +1,4 @@
-# I am not leaving here until i come up with a solution that works for the mpc.
+
 import numpy as np
 from scipy.optimize import minimize
 class MPC:
@@ -93,7 +93,7 @@ class MPC:
         x = x0
         for _ in range(n_iter):
             u_opt = self.get_opt_control(x)
-            u_opt = [0]
+            u_opt = [0] # currently doing no control just to try and see where the error is..
             u_taken = np.array([u_opt[0]])
             x = self.runge_kutta(x, u_taken,dt)
             states.append(x)
