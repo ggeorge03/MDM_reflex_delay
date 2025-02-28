@@ -13,7 +13,7 @@ class animPendulum:
 
 
         def _animate(i):
-            time_text.set_text(f'frame = {i:.1f} s,  theta = {theta_vals[i]} \n, x = {xcartpositons[i]}')
+            time_text.set_text(f'Time = {(0.1*i):.1f} s,  theta = {theta_vals[i]} \n, x = {xcartpositons[i]}')
             x_bob, y_bob = xbob[i], ybob[i]
             x_cart = xcartpositons[i]
             ln1.set_data([x_bob], [y_bob])
