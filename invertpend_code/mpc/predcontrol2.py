@@ -1,5 +1,7 @@
 import numpy as np
 from scipy.optimize import minimize
+from anim import animPendulum
+import matplotlib.pyplot as plt
 class MPC:
     # this is pretty much only useable for an inverted pendulum model atm, but can be adapted for other models.
 
@@ -16,15 +18,8 @@ class MPC:
         self.v = cont_hor # control horizon 
         self.z = np.array(desired_state) # reference trajectory - for this we can treat it as constant but could be adjusted to vary with time.
 
-    def set_bounds(self, min, max):
-        '''
-        min and max should have the same dimensions as x
-        ie if x = [x1,x2,x3..etc], xmin should be [x1_min, x2_min etc...]
-        '''
-        self.states_lb = min
-        self.states_ub  = max
 
-    def mpc_cost_function(self,u_sequence):
+    def mpc_cost_function(self,u_sequence,dt):
         '''
         Cost function for MPC that heavily penalizes theta deviations.
         If it didn't penalise theta as much it thinks the most efficient way is to repeatedly swing it up and down.
@@ -63,18 +58,32 @@ class MPC:
             J += state_cost + control_cost + penalty
             
             # Propagate dynamics to next state
-            x = self.dynamics_model(x, u[k])
+            x = self.runge_kutta(x, u[k],dt)
         
         return J
     
-    def get_opt_control(self, x0):
+    def get_opt_control(self, x0,dt):
+
+        bounds = [(self.input_lb, self.input_ub) for _ in range(self.f)]
+
         self.x0 = np.array(x0)
         initial_guess = np.ones(self.f)*0.5
-        u = minimize(self.mpc_cost_function, initial_guess, method="SLSQP")
-        if u.success:
-            return u.x
+        result = minimize(
+                    self.mpc_cost_function,
+                    initial_guess,
+                    args=(dt),
+                    method="SLSQP",
+                    bounds=bounds,
+                    options={
+                        'ftol': 1e-4,
+                        'maxiter': 300, # increase number of iterations
+                        'disp': False
+                    }
+                )
+        if result.success:
+            return result.x
         else:
-            raise ValueError("Optimization failed: " + u.message)
+            raise ValueError("Optimization failed: " + result.message)
 
     def dynamics_model(self, x, u):
         
@@ -95,15 +104,23 @@ class MPC:
         k4 = self.dynamics_model(x + k3 * dt, u)
         return x + (k1 + 2*k2 + 2*k3 + k4) * dt / 6
     
+    def set_bounds(self, state_min, state_max, input_min=-10, input_max=10):
+
+        self.states_lb = state_min
+        self.states_ub = state_max
+        self.input_lb = input_min
+        self.input_ub = input_max
+    
     def sim_model(self,x0,n_iter=100, dt=0.1,delay=1):
         states = [x0]
         control_inputs = []
         x = x0
         for k in range(n_iter):
+            print(f"timestep: {k}")
             if k > delay:
-                u_opt = self.get_opt_control(states[k-delay])
+                u_opt = self.get_opt_control(states[k-delay],dt)
             else: u_opt = [0]
-            #u_opt = [0]
+            #u_opt = [0] - uncomment if you want to run with no control input.
             u_taken = np.array([u_opt[0]])
             x = self.runge_kutta(x, u_taken,dt)
             states.append(x)
@@ -113,24 +130,23 @@ class MPC:
 
 def initialise_variables():
     M = 1.0   # mass of the cart (kg)
-    m_p = 0.1 # mass of the pendulum (kg)
+    m = 0.1 # mass of the pendulum (kg)
     g = 9.81  # gravity (m/s^2)
-    l = 5.0   # length of the pendulum (m)
-
+    l = 1.0   # length of the pendulum (m)
     def initialise_matricies():
-        A = [
-            [0, 1, 0, 0],
-            [0, 0, (m_p*g)/l, 0],
-            [0, 0, 0, 1],
-            [0, 0, (M+m_p)/M, 0]
-            ]
-
-        B = [
+        A = np.array([
+        [0, 1, 0, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 1],
+        [0, 0, g/l, 0]
+    ])
+    
+        B = np.array([
             [0],
-            [1/M],
+            [1/m],
             [0],
-            [-1 / M*l]
-            ]
+            [-1/(m*l)]
+        ])
         C = np.eye(4)
 
         Q = np.diag([1,1,100,10])
@@ -148,5 +164,12 @@ if __name__ == "__main__": # for testing..
     matricies = initialise_variables()
     mpc = MPC(*matricies,pred_hor=20, cont_hor= 0 ,desired_state=[0,0,0,0])
     mpc.set_bounds([-5,-5,-np.pi/2, -2], [5,5,np.pi/2, 2])
-    x0 = np.array([0,0,0.1,0])
-    states, inputs = mpc.sim_model(x0)
+    x0 = np.array([0,0,0.01,0])
+    states, inputs = mpc.sim_model(x0,n_iter=1000,dt=0.1,delay=1) # 1ms
+    x, x_dot, theta, theta_dot = states[:, 0], states[:, 1], states[:, 2], states[:, 3]
+    pend=animPendulum(theta, x, 1, 5, m=4)
+    plt.plot(theta,label="theta")
+    plt.title("theta against time")
+    plt.plot(inputs,label="inputs")
+    plt.legend()
+    plt.show()
