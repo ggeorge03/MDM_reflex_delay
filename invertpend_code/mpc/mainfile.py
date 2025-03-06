@@ -1,4 +1,4 @@
-from predcontrol2 import MPC
+from mpc_control import MPC
 import numpy as np
 from anim import animPendulum
 import matplotlib.pyplot as plt
