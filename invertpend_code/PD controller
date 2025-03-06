@@ -1,14 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-def simulate_pd_dde(m=0.191,      # mass in kg (191 g)
+def simulate_pd_dde(m=0.191,      # mass in kg
                     L=1.0,        # stick length in meters
-                    g=9.81,       # gravitational acceleration (m/s²)
+                    g=9.81,       # gravitational acceleration
                     P=3.0,        # proportional gain
                     D=0.5,        # derivative gain
-                    T=0.1,        # reaction delay (seconds)
+                    T=0.1,        # reaction delay
                     dt=0.001,     # time step
-                    t_max=10.0,   # total simulation time (seconds)
+                    t_max=10.0,   # total simulation time
                     initial_angle=0.05  # initial disturbance angle in radians
                    ):
     """
@@ -23,20 +23,20 @@ def simulate_pd_dde(m=0.191,      # mass in kg (191 g)
     # Calculate moment of inertia for a uniform rod pivoted at one end
     J = (1/3) * m * L**2
     
-    # Create history data for time t from -T to 0
+    
     t_history = np.arange(-T, 0, dt)
     n_history = len(t_history)
     theta_history = np.full(n_history, initial_angle)  # constant initial angle
     theta_dot_history = np.zeros(n_history)            # initial angular velocity is zero
     acceleration_history = np.zeros(n_history)           # initial angular acceleration is zero
     
-    # Initialize lists to store simulation data (including history)
+    # Initialize lists to store simulation data
     t_vals = list(t_history)
     theta_vals = list(theta_history)
     theta_dot_vals = list(theta_dot_history)
     acceleration_vals = list(acceleration_history)
     
-    # Function to obtain the state (theta and theta_dot) at any time t_query via linear interpolation
+    # Function to obtain the state (theta and theta_dot) at any time t_query
     def get_state_at(t_query):
         if t_query < t_vals[0]:
             return initial_angle, 0.0
@@ -57,12 +57,12 @@ def simulate_pd_dde(m=0.191,      # mass in kg (191 g)
         t_delayed = t_current - T
         theta_delayed, theta_dot_delayed = get_state_at(t_delayed)
         
-        # Compute derivatives based on the model
+      
         # dθ/dt = θ̇ and dθ̇/dt = (m*g*L/J)*θ(t) - (P*θ(t-T) + D*θ̇(t-T))/J
         dtheta_dt = theta_dot_current
         dtheta_dot_dt = (m * g * L / J) * theta_current - (P * theta_delayed + D * theta_dot_delayed) / J
         
-        # Update the state using Euler integration
+        # Using Euler integration
         theta_next = theta_current + dt * dtheta_dt
         theta_dot_next = theta_dot_current + dt * dtheta_dot_dt
         
@@ -81,7 +81,7 @@ t, theta, theta_dot, acceleration = simulate_pd_dde(m=0.191, L=1.0, g=9.81, P=3.
 # Plot the angle and angular acceleration curves over time
 plt.figure(figsize=(12, 8))
 
-# Subplot 1: Angle vs. time
+# Subplot： Angle vs. time
 plt.subplot(2, 1, 1)
 plt.plot(t, theta, label='Angle (θ, rad)')
 plt.xlabel('Time (s)')
@@ -90,7 +90,7 @@ plt.title('PD Control Delayed System: Angle')
 plt.legend()
 plt.grid(True)
 
-# Subplot 2: Angular acceleration vs. time
+# Subplot: Angular acceleration vs. time
 plt.subplot(2, 1, 2)
 plt.plot(t, acceleration, label='Angular Acceleration (θ̈, rad/s²)', color='red')
 plt.xlabel('Time (s)')
