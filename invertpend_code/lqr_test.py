@@ -1,6 +1,6 @@
 import numpy as np
 import scipy.linalg
-# import scipy.integrate
+import scipy.integrate
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from ddeint import ddeint
@@ -12,7 +12,7 @@ M = 1  # Mass of cart
 L = 3  # Length of pendulum
 g = -10  # Gravity
 d = 1  # Damping coefficient
-tau = 0.01
+tau = 0
 
 s = 1  # System mode
 
@@ -42,19 +42,24 @@ P = scipy.linalg.solve_continuous_are(A, B, Q, R)
 K = np.linalg.inv(R) @ B.T @ P
 
 
-def cartpend_lqr(t, Y, y0):
+def cartpend_lqr(t, y):
     '''.'''
     if s == -1:
         y_ref = np.array([4, 0, 0, 0])
     else:
-        y_ref = np.array([1, 0, np.pi, 0])
+        y_ref = np.array([0, 0, np.pi, 0])
 
-    if t > tau:
-        y_tau = Y(t - tau)  # Get state from history
-    else:
-        y_tau = y0  # Use the initial state if time <= tau
+    # Apply LQR control using delayed state
+    # y_tau = history(t - tau)  # Use history function to get delayed state
+    # u = (-K @ (y_tau - y_ref)).item()  # Compute control input
 
-    u_tau = (-K @ (y_tau - y_ref)).item()
+    # if t > tau:
+    #     y_tau = Y(t - tau)  # Get state from history
+    # else:
+    #     y_tau = y0  # Use the initial state if time <= tau
+
+    # u_tau = (-K @ (y_tau - y_ref)).item()
+    # print(f"Control input u_tau: {u_tau}")
 
     # # Get delayed state Y(t - tau), use initial history if t < tau
     # y_tau = y(t - tau) if t > tau else y(0)
@@ -62,21 +67,22 @@ def cartpend_lqr(t, Y, y0):
     # # Compute delayed control input
     # u_delayed = (-K @ (y_tau - y_ref)).item()
 
-    # u = (-K @ (y - y_ref)).item()  # Compute control input
+    u = (-K @ (y - y_ref)).item()  # Compute control input
     # Call cart-pendulum dynamics
-    return cartpend(Y(t), m, M, L, g, d, u_tau)
-
-
-tspan = np.arange(0, 10, 0.001)
-if s == -1:
-    y0 = np.array([0, 0, 0, 0])
-else:
-    y0 = np.array([-3, 3, np.pi + 0.1, 2])
-# Define history function
+    # return cartpend(Y(t), m, M, L, g, d, u_tau)
+    return cartpend(y, m, M, L, g, d, u)
 
 
 def history(t):
     return y0
+
+
+tspan = np.arange(0, 10, 0.001)
+if s == -1:
+    y0 = np.array([4, 0, 0, 0])
+else:
+    y0 = np.array([-3, 3, np.pi + 0.1, 2])
+# Define history function
 
 
 # Time span and initial conditions
@@ -87,11 +93,12 @@ def history(t):
 #     y0 = np.array([-3, 3, np.pi + 0.1, 2])
 
 # sol = ddeint(cartpend_lqr, history, tspan)
-sol = ddeint(lambda Y, t: cartpend_lqr(t, Y, y0), history, tspan)
+# sol = ddeint(lambda Y, t: cartpend_lqr(t, Y), history, tspan)
 
 # Solve the differential equation
-# sol = scipy.integrate.solve_ivp(
-#     cartpend_lqr, [0, 10], y0, t_eval=tspan, method='RK45')
+sol = scipy.integrate.solve_ivp(
+    cartpend_lqr, [0, 10], y0, t_eval=tspan, method='RK45')
+# sol = ddeint(cartpend_lqr, history, tspan)
 
 # Define history function (for times t < 0)
 
@@ -104,8 +111,8 @@ sol = ddeint(lambda Y, t: cartpend_lqr(t, Y, y0), history, tspan)
 # sol = ddeint(cartpend_lqr, history, tspan)
 
 # Extract cart position and pendulum angle
-cart_x = sol[0]  # Cart position
-pendulum_theta = sol[2]  # Pendulum angle
+cart_x = sol.y[0]  # Cart position
+pendulum_theta = sol.y[2]  # Pendulum angle
 
 # Compute pendulum end coordinates
 pendulum_x = cart_x + L * np.sin(pendulum_theta)
@@ -138,9 +145,9 @@ def update(frame):
 
 
 # Get the number of time steps in the solution
-frames = len(sol[0])
+# frames = len(sol[0])
 
 # Create the animation
 ani = animation.FuncAnimation(
-    fig, update, frames=frames, init_func=init, blit=True, interval=0)
+    fig, update, frames=len(tspan), init_func=init, blit=True, interval=0)
 plt.show()
