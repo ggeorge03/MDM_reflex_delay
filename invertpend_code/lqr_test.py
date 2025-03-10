@@ -8,11 +8,11 @@ from Eqs_of_motion import cartpend
 
 # System parameters
 m = 0.191  # Mass of pendulum
-M = 3.5  # Mass of cart
-L = 2  # Length of pendulum
-g = -10  # Gravity
+M = 3.5  # Mass of human arm
+L = 1.2  # Length of pendulum
+g = -10  # Acceleration due to gravity
 d = 1  # Damping coefficient
-tau = 0.2
+tau = 0.2  # Reflex delay
 
 s = 1  # System mode
 
@@ -35,7 +35,7 @@ Q = np.array([[1, 0, 0, 0],
 
 R = np.array([[1]])
 
-# Solve the continuous-time algebraic Riccati equation (CARE)
+# Solve the continuous-time algebraic equation
 P = scipy.linalg.solve_continuous_are(A, B, Q, R)
 
 # Compute LQR gain K
@@ -58,7 +58,7 @@ def cartpend_lqr_with_delay(t, Y, y0):
     """Compute LQR control input with time delay."""
     # Reference state (set point for the system)
     if s == -1:
-        y_ref = np.array([4, 0, 0, 0])
+        y_ref = np.array([0, 0, 0, 0])
     else:
         y_ref = np.array([0, 0, np.pi, 0])
 
@@ -82,38 +82,14 @@ def history(t):
 
 tspan = np.arange(-tau, 10, 0.005)
 if s == -1:
-    y0 = np.array([4, 0, 0, 0])
+    y0 = np.array([0, 0, 0, 0])
 else:
-    y0 = np.array([0, 2, np.pi, 0.5])
-# Define history function
+    y0 = np.array([0, 0, np.pi, -0.5])
 
 
-# Time span and initial conditions
-
-# if s == -1:
-#     y0 = np.array([0, 0, 0, 0])
-# else:
-#     y0 = np.array([-3, 3, np.pi + 0.1, 2])
-
-# sol = ddeint(cartpend_lqr, history, tspan)
-# sol = ddeint(lambda Y, t: cartpend_lqr(t, Y), history, tspan)
-
-# Solve the differential equation
-# sol = scipy.integrate.solve_ivp(
-    # cartpend_lqr_without_delay, [0, 10], y0, t_eval = tspan, method = 'RK45')
-# sol = ddeint(cartpend_lqr_with_delay, history, tspan)
 sol = ddeint(lambda Y, t: cartpend_lqr_with_delay(
     t, Y, y0), history, tspan)
 
-# Define history function (for times t < 0)
-
-
-# def history(t):
-#     return y0
-
-
-# # Solve the delay differential equation
-# sol = ddeint(cartpend_lqr, history, tspan)
 
 # Extract cart position and pendulum angle
 cart_x = sol[:, 0]  # Cart position
@@ -149,10 +125,18 @@ def update(frame):
     return cart, pendulum
 
 
-# Get the number of time steps in the solution
-# frames = len(sol[0])
-
 # Create the animation
 ani = animation.FuncAnimation(
     fig, update, frames=len(tspan), init_func=init, blit=True, interval=0)
+plt.show()
+
+
+# Plot distance from zero over time
+plt.figure()
+plt.plot(tspan, cart_x, label='x position')
+plt.xlabel('Time (s)')
+plt.ylabel('Distance from 0')
+plt.title('Distance of Cart from Zero Over Time')
+plt.legend()
+plt.grid()
 plt.show()
