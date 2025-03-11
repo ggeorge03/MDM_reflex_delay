@@ -101,3 +101,97 @@ plt.grid(True)
 
 plt.tight_layout()
 plt.show()
+
+
+
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+def simulate_pd_dde(m=0.191, L=0.6, g=9.81, P=0.7, D=0.1, T=0.18, dt=0.001, t_max=10.0, initial_angle=0.001):
+    """
+    模拟带延时PD控制的倒立摆（棍子平衡）问题。对于均匀杆：
+      - 转动惯量 J = (1/3)*m*L^2
+      - 重力力矩按重心位置计算：m*g*(L/2)
+    
+    控制律： Q(t) = P*θ(t-T) + D*θ̇(t-T)
+    角加速度为：
+       θ̈(t) = [m*g*(L/2)/J]*θ(t) - [P*θ(t-T) + D*θ̇(t-T)]/J
+    
+    当θ超过设定阈值时认为棍子“倒下”。
+    """
+    # 计算转动惯量
+    J = (1/3) * m * L**2
+    # 重力项系数
+    grav_factor = m * g * (L/2) / J
+
+    # 初始化历史记录：在t in [-T, 0]内，假定角度为初始值，角速度为0
+    t_history = np.arange(-T, 0, dt)
+    n_history = len(t_history)
+    theta_history = np.full(n_history, initial_angle)
+    theta_dot_history = np.zeros(n_history)
+
+    # 用列表记录整个时间序列
+    t_vals = list(t_history)
+    theta_vals = list(theta_history)
+    theta_dot_vals = list(theta_dot_history)
+
+    # 插值函数：用于获取任意时间点t_query的状态
+    def get_state_at(t_query):
+        if t_query < t_vals[0]:
+            return initial_angle, 0.0
+        elif t_query <= 0:
+            return initial_angle, 0.0
+        else:
+            theta = np.interp(t_query, t_vals, theta_vals)
+            theta_dot = np.interp(t_query, t_vals, theta_dot_vals)
+            return theta, theta_dot
+
+    t_current = 0.0
+    while t_current < t_max:
+        theta_current = theta_vals[-1]
+        theta_dot_current = theta_dot_vals[-1]
+        
+        # 获取延时T时刻的状态
+        t_delayed = t_current - T
+        theta_delayed, theta_dot_delayed = get_state_at(t_delayed)
+        
+        # 角度和角速度微分
+        dtheta_dt = theta_dot_current
+        dtheta_dot_dt = grav_factor * theta_current - (P * theta_delayed + D * theta_dot_delayed) / J
+        
+        # 欧拉积分更新状态
+        theta_next = theta_current + dt * dtheta_dt
+        theta_dot_next = theta_dot_current + dt * dtheta_dot_dt
+        
+        t_current += dt
+        t_vals.append(t_current)
+        theta_vals.append(theta_next)
+        theta_dot_vals.append(theta_dot_next)
+        
+        # 当角度超过设定阈值时认为棍子倒下，结束仿真
+        if abs(theta_next) > 0.8:
+            break
+
+    return np.array(t_vals), np.array(theta_vals), np.array(theta_dot_vals)
+
+# 设置参数并运行仿真
+t, theta, theta_dot = simulate_pd_dde(m=0.191, L=0.6, g=9.81, P=0.7, D=0.1, T=0.18, dt=0.001, t_max=10.0, initial_angle=0.001)
+
+# 绘制角度随时间变化的曲线
+plt.figure(figsize=(10, 6))
+plt.plot(t, theta, label='棍子角度 (rad)')
+plt.xlabel('时间 (s)')
+plt.ylabel('角度 (rad)')
+plt.title('PD控制器模拟：棍子平衡情况')
+plt.axhline(0.8, color='r', linestyle='--', label='倒下阈值')
+plt.axhline(-0.8, color='r', linestyle='--')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# 输出仿真持续时间（当棍子达到倒下阈值时的时间）
+print(f"棍子平衡的时间约为 {t[-1]:.3f} 秒")
+
+
