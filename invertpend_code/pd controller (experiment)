@@ -1,0 +1,89 @@
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+def simulate_pd_dde(m=0.191, L=0.61, g=9.81, P=0.7, D=0.1, T=0.18, dt=0.001, t_max=20.0, initial_angle=0.001):
+    """
+    Simulate the inverted pendulum (stick balancing) problem under delayed PD control.
+    For a uniform rod:
+      - Moment of inertia J = (1/3)*m*L^2
+      - Gravitational torque is calculated based on the center of mass: m*g*(L/2)
+    
+    Control law: Q(t) = P*θ(t-T) + D*θ̇(t-T)
+    The angular acceleration is given by:
+       θ̈(t) = [m*g*(L/2)/J]*θ(t) - [P*θ(t-T) + D*θ̇(t-T)]/J
+    
+    When θ exceeds the specified threshold, the stick is considered to have fallen.
+    """
+    # Calculate the moment of inertia
+    J = (1/3) * m * L**2
+    # Gravitational factor coefficient
+    grav_factor = m * g * (L/2) / J
+
+    # Initialize history: for t in [-T, 0], assume the angle is the initial value and angular velocity is 0
+    t_history = np.arange(-T, 0, dt)
+    n_history = len(t_history)
+    theta_history = np.full(n_history, initial_angle)
+    theta_dot_history = np.zeros(n_history)
+
+    # Record the entire time series using lists
+    t_vals = list(t_history)
+    theta_vals = list(theta_history)
+    theta_dot_vals = list(theta_dot_history)
+
+    # Interpolation function: used to get the state at any time point t_query
+    def get_state_at(t_query):
+        if t_query < t_vals[0]:
+            return initial_angle, 0.0
+        elif t_query <= 0:
+            return initial_angle, 0.0
+        else:
+            theta = np.interp(t_query, t_vals, theta_vals)
+            theta_dot = np.interp(t_query, t_vals, theta_dot_vals)
+            return theta, theta_dot
+
+    t_current = 0.0
+    while t_current < t_max:
+        theta_current = theta_vals[-1]
+        theta_dot_current = theta_dot_vals[-1]
+        
+        # Obtain the state at time delayed by T
+        t_delayed = t_current - T
+        theta_delayed, theta_dot_delayed = get_state_at(t_delayed)
+        
+        # Derivatives of angle and angular velocity
+        dtheta_dt = theta_dot_current
+        dtheta_dot_dt = grav_factor * theta_current - (P * theta_delayed + D * theta_dot_delayed) / J
+        
+        # Update the state using Euler integration
+        theta_next = theta_current + dt * dtheta_dt
+        theta_dot_next = theta_dot_current + dt * dtheta_dot_dt
+        
+        t_current += dt
+        t_vals.append(t_current)
+        theta_vals.append(theta_next)
+        theta_dot_vals.append(theta_dot_next)
+        
+        # When the angle exceeds the set threshold, consider the stick to have fallen and end the simulation
+        if abs(theta_next) > 0.8:
+            break
+
+    return np.array(t_vals), np.array(theta_vals), np.array(theta_dot_vals)
+
+# Set parameters and run the simulation
+t, theta, theta_dot = simulate_pd_dde(m=0.191, L=0.6, g=9.81, P=0.7, D=0.1, T=0.18, dt=0.001, t_max=10.0, initial_angle=0.001)
+
+# Plot the angle versus time curve
+plt.figure(figsize=(10, 6))
+plt.plot(t, theta, label='Stick Angle (rad)')
+plt.xlabel('Time (s)')
+plt.ylabel('Angle (rad)')
+plt.title('PD Controller Simulation: Stick Balancing')
+plt.axhline(0.8, color='r', linestyle='--', label='Fallen Threshold')
+plt.axhline(-0.8, color='r', linestyle='--')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# Output the simulation duration (the time when the stick reaches the fallen threshold)
+print(f"Stick balancing time is approximately {t[-1]:.3f} seconds")
