@@ -3,15 +3,16 @@ import scipy.linalg
 import scipy.integrate
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
+from matplotlib.animation import PillowWriter
 from ddeint import ddeint
 from Eqs_of_motion import cartpend
 
 # System parameters
 m = 0.191  # Mass of pendulum
-M = 3.5  # Mass of human arm
-L = 1.2  # Length of pendulum
-g = -10  # Acceleration due to gravity
-d = 1  # Damping coefficient
+M = 4.5  # Mass of human arm
+L = 2  # Length of pendulum
+g = -9.81  # Acceleration due to gravity
+d = 0.01  # Damping coefficient
 tau = 0.2  # Reflex delay
 
 s = 1  # System mode
@@ -42,18 +43,6 @@ P = scipy.linalg.solve_continuous_are(A, B, Q, R)
 K = np.linalg.inv(R) @ B.T @ P
 
 
-# def cartpend_lqr_without_delay(t, y):
-#     '''.'''
-#     if s == -1:
-#         y_ref = np.array([4, 0, 0, 0])
-#     else:
-#         y_ref = np.array([0, 0, np.pi, 0])
-
-#     u = (-K @ (y - y_ref)).item()  # Compute control input
-
-#     return cartpend(y, m, M, L, g, d, u)
-
-
 def cartpend_lqr_with_delay(t, Y, y0):
     """Compute LQR control input with time delay."""
     # Reference state (set point for the system)
@@ -80,11 +69,11 @@ def history(t):
     return np.array(y0)
 
 
-tspan = np.arange(-tau, 10, 0.005)
+tspan = np.arange(-tau, 10, 0.02)
 if s == -1:
     y0 = np.array([0, 0, 0, 0])
 else:
-    y0 = np.array([0, 0, np.pi, -0.5])
+    y0 = np.array([0, 0, np.pi - 0.05, 0])
 
 
 sol = ddeint(lambda Y, t: cartpend_lqr_with_delay(
@@ -93,7 +82,9 @@ sol = ddeint(lambda Y, t: cartpend_lqr_with_delay(
 
 # Extract cart position and pendulum angle
 cart_x = sol[:, 0]  # Cart position
+cart_x_dot = sol[:, 1]  # Cart velocity
 pendulum_theta = sol[:, 2]  # Pendulum angle
+pendulum_theta_dot = sol[:, 3]
 
 # Compute pendulum end coordinates
 pendulum_x = cart_x + L * np.sin(pendulum_theta)
@@ -127,16 +118,22 @@ def update(frame):
 
 # Create the animation
 ani = animation.FuncAnimation(
-    fig, update, frames=len(tspan), init_func=init, blit=True, interval=0)
+    fig, update, frames=len(tspan), init_func=init, blit=True, interval=10)
 plt.show()
 
+# writer = PillowWriter(fps=20)
+# ani.save("state_variables.gif")
 
-# Plot distance from zero over time
-plt.figure()
-plt.plot(tspan, cart_x, label='x position')
+
+# Plot all state variables over time
+plt.figure(figsize=(12, 8))
+plt.plot(tspan, cart_x, label='x')
+plt.plot(tspan, cart_x_dot, label='v')
+plt.plot(tspan, pendulum_theta, label='θ')
+plt.plot(tspan, pendulum_theta_dot, label='ω')
 plt.xlabel('Time (s)')
-plt.ylabel('Distance from 0')
-plt.title('Distance of Cart from Zero Over Time')
+plt.ylabel('State Values')
+plt.title(f'State Variables Over Time with {tau}s Delay')
 plt.legend()
 plt.grid()
 plt.show()
